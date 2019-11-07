@@ -2,7 +2,9 @@
 
 On my windows 10 laptop from work it is possible to make use of Docker, but due to security restrctions that are in place, I am not able to bind mount a windows folder in a container.
 
-In order to be able to still work easily with data volumes and access the content of them from within my windows environment I updated the dperson/samba container image to not only contain a Docker installation to check all data volumes, but also keep on refreshing the list of shares whenever a data volumes are added/removed.
+In order to be able to still work easily with data volumes and access the content of them from within windows environment user gdiepen updated the dperson/samba container image to not only contain a Docker installation to check all data volumes, but also keep on refreshing the list of shares whenever a data volumes are added/removed.
+
+Original version of gdiepen/volume-sharer mounted each volume as a separate share. This solves inital problem of accessing volumes from the other machine, but I prefer to have one only one share that contains all the volumes inside in order to mount it as a drive in Windows for faster access
 
 # Usage
 
@@ -27,6 +29,4 @@ If you don't have samba running on your host-system, you can bind the ports. The
 
 
 ##More details
-I have placed more information on my blog article: https://www.guidodiepen.nl/2017/08/sharing-all-your-docker-data-volumes-via-samba/
-
-
+https://www.guidodiepen.nl/2017/08/sharing-all-your-docker-data-volumes-via-samba/
