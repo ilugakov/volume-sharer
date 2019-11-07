@@ -4,18 +4,19 @@
 #
 #         USAGE: ./volume-sharer.sh
 #
-#   DESCRIPTION: Entrypoint for gdiepen/volume-sharer docker container
+#   DESCRIPTION: Entrypoint for ilugakov/volume-sharer docker container
 #
 #       OPTIONS: ---
 #  REQUIREMENTS: ---
 #          BUGS: ---
 #         NOTES: Updated version
+#        AUTHOR: Igor Lugakov (ilugakov@gmail.com),
 #        AUTHOR: Guido Diepen (site-github@guidodiepen.nl),
 #        AUTHOR: David Personette (dperson@gmail.com),
 #  ORGANIZATION:
-#       CREATED: 09/28/2014 12:11
-#      REVISION: 1.1
-#      BASED ON: https://github.com/dperson/samba (dperson@gmail.com)
+#       CREATED: 07 Nov 2019
+#      REVISION: 1.2
+#      BASED ON: https://github.com/gdiepen/volume-sharer (site-github@guidodiepen.nl)
 #===============================================================================
 
 set -o nounset                              # Treat unset variables as an error
@@ -98,34 +99,14 @@ share() { local share="$1" path="$2" browsable=${3:-yes} ro=${4:-yes} \
     echo "" >>$file
 }
 
-
-
-volumeshare() { local share="$1" path="$2" browsable=${3:-yes} ro=${4:-yes} \
-                guest=${5:-yes} users=${6:-""} admins=${7:-""} \
-                writelist=${8:-""} file=/etc/samba/volume_shares.conf
-    sed -i "/\\[$share\\]/,/^\$/d" $file
-    echo "[$share]" >>$file
-    echo "   path = $path" >>$file
-    echo "   browsable = $browsable" >>$file
-    echo "   read only = $ro" >>$file
-    echo "   guest ok = $guest" >>$file
-    echo -n "   veto files = /._*/.apdisk/.AppleDouble/.DS_Store/" >>$file
-    echo -n ".TemporaryItems/.Trashes/desktop.ini/ehthumbs.db/" >>$file
-    echo "Network Trash Folder/Temporary Items/Thumbs.db/" >>$file
-    echo "   delete veto files = yes" >>$file
-    [[ ${users:-""} && ! ${users:-""} =~ all ]] &&
-        echo "   valid users = $(tr ',' ' ' <<< $users)" >>$file
-    [[ ${admins:-""} && ! ${admins:-""} =~ none ]] &&
-        echo "   admin users = $(tr ',' ' ' <<< $admins)" >>$file
-    [[ ${writelist:-""} && ! ${writelist:-""} =~ none ]] &&
-        echo "   write list = $(tr ',' ' ' <<< $writelist)" >>$file
-    echo "" >>$file
+createsymlinks() { local sharename="$1" path="$2" linkto="$3" 
+    mkdir -p $linkto
+	
+	if [ ! -h "$linkto/$sharename" ]
+	then
+		ln -s $path $linkto/$sharename
+	fi
 }
-
-
-
-
-
 
 ### smb: disable SMB2 minimun
 # Arguments:
@@ -183,14 +164,15 @@ widelinks() { local file=/etc/samba/smb.conf \
 }
 
 
-create_volume_shares(){
+create_volume_shares(){ local linkto="/usr/share/volume_symlinks"
     #Now loop over all of the volume shares
     rm -f /etc/samba/volume_shares.conf
     touch /etc/samba/volume_shares.conf
     for docker_volume in `docker volume ls | grep "^local" | sed 's/^local *//'`
     do
-        eval volumeshare ${docker_volume} "/docker_volumes/${docker_volume}/_data" "yes" "no"
+        eval createsymlinks ${docker_volume} "/docker_volumes/${docker_volume}/_data" ${linkto}
     done
+	eval share "volumes" ${linkto} "yes" "no"
 }
 
 
@@ -234,7 +216,6 @@ Options (fields in '[]' are optional, '<>' are required):
     -w \"<workgroup>\"       Configure the workgroup (domain) samba should use
                 required arg: \"<workgroup>\"
                 <workgroup> for samba
-    -W          Allow access wide symbolic links
 The 'command' (if provided and valid) will be run instead of samba
 " >&2
     exit $RC
@@ -250,7 +231,7 @@ echo "include = /etc/samba/volume_shares.conf" >> /etc/samba/smb.conf
 [[ "${USERID:-""}" =~ ^[0-9]+$ ]] && usermod -u $USERID -o smbuser
 [[ "${GROUPID:-""}" =~ ^[0-9]+$ ]] && groupmod -g $GROUPID -o users
 
-while getopts ":hc:i:nprs:St:u:Ww:" opt; do
+while getopts ":hc:i:nprs:St:u:w:" opt; do
     case "$opt" in
         h) usage ;;
         c) charmap "$OPTARG" ;;
@@ -263,7 +244,6 @@ while getopts ":hc:i:nprs:St:u:Ww:" opt; do
         t) timezone "$OPTARG" ;;
         u) eval user $(sed 's|;| |g' <<< $OPTARG) ;;
         w) workgroup "$OPTARG" ;;
-        W) widelinks ;;
         "?") echo "Unknown option: -$OPTARG"; usage 1 ;;
         ":") echo "No argument value for option: -$OPTARG"; usage 2 ;;
     esac
@@ -289,6 +269,7 @@ elif [[ $# -ge 1 ]]; then
 elif ps -ef | egrep -v grep | grep -q smbd; then
     echo "Service already running, please restart container to apply changes"
 else
+	widelinks
     [[ ${NMBD:-""} ]] && ionice -c 3 nmbd -D
     exec ionice -c 3 smbd -FS & 
     
