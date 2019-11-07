@@ -1,16 +1,12 @@
 FROM dperson/samba
-MAINTAINER site-github@guidodiepen.nl
+MAINTAINER Igor Lugakov <ilugakov@gmail.com>
 
 VOLUME ["/etc/samba"]
 
-
 #Based on this, we now install docker inside this image
-#this means we have to install cURL and docker
-RUN apt-get update -qq -y  && \
-    apt-get install -qqy --force-yes curl && \
-    curl -sSL https://get.docker.com | sh && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/*
+RUN apk --no-cache --no-progress upgrade && \
+    apk --no-cache --no-progress add docker && \
+    rm -rf /tmp/*
 
 #This is needed to ensure smbd is running as root to access
 #all the files in the volumes directory
